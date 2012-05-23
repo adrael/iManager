@@ -1,7 +1,8 @@
 iManager is an multi-platform iPhone manager developped using Qt.
-With iManager, you can browse your SMSs, Calendars, Notes, Contacts, Calls, Contacts Pictures, but you
-can also edit them, backup them in a secure way using advanced cryptographic features.
-This way it's even possible to restore your iDevice via iTunes.
+With iManager, you can browse your SMSs, Calendars, Notes, Contacts,
+Calls, Contacts Pictures, but you can also edit or backup them in a secure way,
+using advanced cryptographic features.
+This way it is even possible to restore your iDevice via iTunes.
 
 This software is works on both 32bits and 64bits architectures.
 
