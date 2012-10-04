@@ -1,0 +1,428 @@
+
+/****************************************************************************
+*  Copyright (C) 2011 Raphaël MARQUES <work.rmarques@gmail.com>
+*
+*  This program is free software: you can redistribute it and/or modify
+*  it under the terms of the GNU General Public License as published by
+*  the Free Software Foundation, either version 3 of the License, or
+*  (at your option) any later version.
+*
+*  This program is distributed in the hope that it will be useful,
+*  but WITHOUT ANY WARRANTY; without even the implied warranty of
+*  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+*  GNU General Public License for more details.
+*
+*  You should have received a copy of the GNU General Public License
+*  along with this program.  If not, see <http://www.gnu.org/licenses/>.
+****************************************************************************/
+
+/** --------------------------------------------------------------------------------------------------------------- **/
+
+#ifndef PICTURES_HPP
+#define PICTURES_HPP
+
+/** --------------------------------------------------------------------------------------------------------------- **/
+
+#include <qobject.h>
+#include <qwidget.h>
+#include <qlayout.h>
+#include <qcombobox.h>
+#include <qscrollbar.h>
+#include <qfiledialog.h>
+#include <qpushbutton.h>
+#include <qtreewidget.h>
+
+#include <qstatemachine.h>
+#include <qgraphicsview.h>
+#include <qgraphicsscene.h>
+#include <qgraphicswidget.h>
+#include <qpropertyanimation.h>
+#include <qgraphicsproxywidget.h>
+#include <qgraphicslinearlayout.h>
+#include <qparallelanimationgroup.h>
+#include <qsequentialanimationgroup.h>
+
+/** --------------------------------------------------------------------------------------------------------------- **/
+
+#include "database.hpp"
+#include "searchbar.hpp"
+
+/** --------------------------------------------------------------------------------------------------------------- **/
+
+class PICTURES : public QWidget {
+
+    Q_OBJECT
+
+public:
+
+    PICTURES(QWidget * parent = 0, database * db = 0, const QString & path = "") : QWidget(parent) {
+        this -> initAttributes(db, path);
+        QHBoxLayout * PicturesLayout = new QHBoxLayout;
+        PicturesLayout -> setContentsMargins(0, 0, 0, 0);
+        PicturesLayout -> setSpacing(0);
+
+        QVBoxLayout * displayLayout = new QVBoxLayout;
+        displayLayout -> setContentsMargins(0, 0, 0, 0);
+        displayLayout -> setSpacing(0);
+
+        this -> PicturesTreeList = new QTreeWidget(this);
+        this -> PicturesTreeList -> setAlternatingRowColors(true);
+        this -> PicturesTreeList -> setSortingEnabled(true);
+        this -> PicturesTreeList -> setIconSize(QSize(50, 50));
+        this -> PicturesTreeList -> setMinimumWidth(250);
+        this -> connect(this -> PicturesTreeList, SIGNAL(itemClicked(QTreeWidgetItem *, int)), this, SLOT(showPicture(QTreeWidgetItem *, int)));
+
+        this -> searchPicture = new SearchBar(tr("Search ..."), this -> appPath + "/utils/icons", this);
+        this -> searchPicture -> setEnabled(false);
+        this -> connect(this -> searchPicture, SIGNAL(hasFocus()), this -> searchPicture, SLOT(clear()));
+        this -> connect(this -> searchPicture, SIGNAL(searchText(const QString &)), this, SLOT(findPictures(const QString &)));
+        this -> connect(this -> searchPicture, SIGNAL(cleaned()), this, SLOT(loadPicturesData()));
+
+        this -> sortPicture = new QComboBox(this);
+        this -> sortPicture -> addItems(QStringList() << tr("Firstname Lastname") << tr("Lastname Firstname"));
+        this -> connect(this -> sortPicture, SIGNAL(currentIndexChanged(int)), this, SLOT(loadPicturesData(int)));
+
+        displayLayout -> addWidget(this -> searchPicture);
+        displayLayout -> addWidget(this -> PicturesTreeList);
+        displayLayout -> addWidget(this -> sortPicture);
+
+        QVBoxLayout * toolsLayout = new QVBoxLayout;
+        toolsLayout -> setContentsMargins(0, 0, 0, 0);
+        toolsLayout -> setSpacing(0);
+
+        this -> download = new QPushButton(QIcon(this -> appPath + "/utils/icons/download.png"), tr("Save photo"), this);
+        this -> download -> setFixedSize(128, 32);
+        this -> download -> setCursor(Qt::PointingHandCursor);
+        this -> download -> setToolTip(tr("Save the current picture on the disk"));
+        this -> connect(this -> download, SIGNAL(clicked()), this, SLOT(savePic()));
+
+        this -> viewContact = new QPushButton(QIcon(this -> appPath + "/utils/icons/contacts.png"), tr("View contact"), this);
+        this -> viewContact -> setFixedSize(128, 32);
+        this -> viewContact -> setCursor(Qt::PointingHandCursor);
+        this -> viewContact -> setToolTip(tr("View the current contact information"));
+        this -> connect(this -> viewContact, SIGNAL(clicked()), this, SLOT(viewContactFnc()));
+
+        QCursor cursor(QPixmap(this -> appPath + "/utils/icons/zoom_in.png").scaled(24, 24, Qt::KeepAspectRatio, Qt::SmoothTransformation));
+
+        this -> bigPic = new QPushButton();
+        this -> bigPic -> setCursor(cursor);
+        this -> connect(this -> bigPic, SIGNAL(clicked()), this, SLOT(fullSize()));
+
+        this -> displayDefaultView();
+
+        /////////// ANIMATION ///////////
+
+        QGraphicsProxyWidget * buttonProxy = new QGraphicsProxyWidget;
+        buttonProxy -> setWidget(this -> bigPic);
+
+        QGraphicsWidget * widget = new QGraphicsWidget;
+        QGraphicsLinearLayout * layout = new QGraphicsLinearLayout(Qt::Vertical, widget);
+        layout -> addItem(buttonProxy);
+        widget -> setLayout(layout);
+
+        QGraphicsScene * scene = new QGraphicsScene(0, 0, 480, 480, this);
+        scene -> setBackgroundBrush(this -> palette().window());
+        scene -> addItem(widget);
+
+        QStateMachine * machine = new QStateMachine;
+        QState * state1 = new QState(machine);
+        QState * state2 = new QState(machine);
+        machine -> setInitialState(state1);
+
+        int x(35), y(50), time(350);
+        state1 -> assignProperty(this -> bigPic, "geometry", QRect(x, y, this -> bigPic -> width(), this -> bigPic -> height()));
+        state2 -> assignProperty(this -> bigPic, "geometry", QRect(x, y, this -> bigPic -> width(), this -> bigPic -> height()));
+
+        ////////////////////////////////////////////////////////////////////////////////////////////////////
+
+        QPropertyAnimation * animation = new QPropertyAnimation(buttonProxy, "opacity");
+        animation -> setDuration(time);
+        animation -> setKeyValueAt(  0, qreal(1));
+        animation -> setKeyValueAt(0.5, qreal(0.5));
+        animation -> setKeyValueAt(  1, qreal(0));
+
+        QPropertyAnimation * move = new QPropertyAnimation(buttonProxy, "pos");
+        move -> setDuration(2 * time);
+        move -> setKeyValueAt(  0, QPointF(x,           y));
+        move -> setKeyValueAt(0.5, QPointF(2 * x,       y));
+        move -> setKeyValueAt(1.0, QPointF(3 * x,       y));
+        move -> setEasingCurve(QEasingCurve::OutExpo);
+
+        QParallelAnimationGroup * para = new QParallelAnimationGroup;
+        para -> addAnimation(animation);
+        para -> addAnimation(move);
+
+        ////////////////////////////////////////////////////////////////////////////////////////////////////
+
+        QPropertyAnimation * animation2 = new QPropertyAnimation(buttonProxy, "opacity");
+        animation2 -> setDuration(time);
+        animation2 -> setKeyValueAt(  0, qreal(0));
+        animation2 -> setKeyValueAt(0.5, qreal(0.5));
+        animation2 -> setKeyValueAt(  1, qreal(1));
+
+        QPropertyAnimation * move2 = new QPropertyAnimation(buttonProxy, "pos");
+        move2 -> setDuration(2 * time);
+        move2 -> setKeyValueAt(  0, QPointF(3 * x,       y));
+        move2 -> setKeyValueAt(0.5, QPointF(0,           y));
+        move2 -> setKeyValueAt(1.0, QPointF(x,           y));
+        move2 -> setEasingCurve(QEasingCurve::OutExpo);
+
+        QParallelAnimationGroup * para2 = new QParallelAnimationGroup;
+        para2 -> addAnimation(animation2);
+        para2 -> addAnimation(move2);
+
+        this -> group = new QSequentialAnimationGroup;
+        this -> group -> addAnimation(para);
+        this -> group -> addAnimation(para2);
+
+        ////////////////////////////////////////////////////////////////////////////////////////////////////
+
+        this -> connect(para, SIGNAL(finished()), this, SLOT(change()));
+
+        QAbstractTransition * t1 = state1 -> addTransition(this -> PicturesTreeList, SIGNAL(itemClicked(QTreeWidgetItem *, int)), state2);
+        t1 -> addAnimation(this -> group);
+
+        QAbstractTransition * t2 = state2 -> addTransition(this -> PicturesTreeList, SIGNAL(itemClicked(QTreeWidgetItem *, int)), state1);
+        t2 -> addAnimation(this -> group);
+
+        machine -> start();
+
+        this -> view = new QGraphicsView(scene);
+        this -> view -> setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+        this -> view -> setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+        this -> maximizeView();
+        this -> view -> setFocusPolicy(Qt::NoFocus);
+
+        ////////////// FIN //////////////
+
+        this -> infoWidget = new QTreeWidget(this);
+        this -> infoWidget -> setFixedHeight(50);
+        this -> infoWidget -> setMinimumWidth(410);
+        this -> infoWidget -> setHeaderLabels(QStringList() << tr("ID") << tr("Weight (approx.)") << tr("Width") << tr("Height"));
+
+        QTreeWidgetItem * info_item = new QTreeWidgetItem(this -> infoWidget);
+        info_item -> setText(0, "-");
+        info_item -> setText(1, "-");
+        info_item -> setText(2, "-");
+        info_item -> setText(3, "-");
+
+        this -> infoWidget -> addTopLevelItem(info_item);
+
+        QHBoxLayout * downLayout = new QHBoxLayout;
+        downLayout -> setContentsMargins(0, 0, 0, 0);
+        downLayout -> setSpacing(0);
+        downLayout -> addStretch();
+        downLayout -> addWidget(this -> download);
+        downLayout -> addStretch();
+        downLayout -> addWidget(this -> viewContact);
+        downLayout -> addStretch();
+
+        toolsLayout -> addWidget(view);
+        toolsLayout -> addWidget(this -> infoWidget);
+        toolsLayout -> addLayout(downLayout);
+
+        PicturesLayout -> addLayout(displayLayout);
+        PicturesLayout -> addLayout(toolsLayout);
+
+        this -> setLayout(PicturesLayout);
+    }
+
+    ~PICTURES() {}
+
+    /** --------------------------------------------------------------------------------------------------------------- **/
+
+    void displayDefaultView() {
+        this -> PicturesTreeList -> setHeaderLabel(tr("There is no picture in the database"));
+        this -> download -> setEnabled(false);
+        this -> viewContact -> setEnabled(false);
+        this -> bigPic -> setEnabled(false);
+        this -> bigPic -> setStyleSheet("QPushButton {border: none;}");
+        this -> bigPic -> setToolTip(tr("Click on the picture to expand it"));
+        this -> bigPic -> setIconSize(QSize(480, 480));
+        this -> bigPic -> setIcon(QIcon(QPixmap(this -> appPath + "/utils/icons/nobody.png").scaled(480, 480, Qt::KeepAspectRatio, Qt::SmoothTransformation)));
+    }
+
+    /** --------------------------------------------------------------------------------------------------------------- **/
+
+    void whoIs(const QString & ID) {
+        for(int i(0); i < this -> PicturesTreeList -> topLevelItemCount(); ++i)
+            if(QString::localeAwareCompare(this -> PicturesTreeList -> topLevelItem(i) -> text(1), ID) == 0) {
+                this -> showPicture(this -> PicturesTreeList -> topLevelItem(i));
+                this -> group -> start();
+            }
+    }
+
+    /** --------------------------------------------------------------------------------------------------------------- **/
+
+public slots:
+
+    void loadPicturesData(const int & = 0) {
+        this -> PicturesTreeList -> clear();
+        int cpt(0);
+
+        for(std::vector<people *>::iterator it(this -> DBManager -> book.begin()); it != this -> DBManager -> book.end(); ++it) {
+            if((*it) -> correctPicture) {
+                ++cpt;
+                QTreeWidgetItem * item = new QTreeWidgetItem(this -> PicturesTreeList);
+                item -> setText(0, (this -> sortPicture -> currentIndex() == 1 ? ((*it) -> last + " " + (*it) -> first) : ((*it) -> first + " " + (*it) -> last)));
+                item -> setIcon(0, (*it) -> thumbnail);
+                item -> setFont(0, QFont("", 8, QFont::Bold));
+                item -> setText(1, QString::number((*it) -> peopleID));
+            }
+        }
+
+        this -> PicturesTreeList -> setHeaderLabel(QString::number(cpt) + " " + (cpt > 1 ? tr("pictures") : tr("picture")));
+        this -> PicturesTreeList -> sortItems(0, Qt::AscendingOrder);
+        this -> showPicture(this -> PicturesTreeList -> topLevelItem(0));
+        this -> change();
+        this -> searchPicture -> setEnabled(true);
+    }
+
+    /** --------------------------------------------------------------------------------------------------------------- **/
+
+private slots:
+
+    void showPicture(QTreeWidgetItem * item, int = 0) {
+        this -> infoWidget -> clear();
+        this -> tmp = this -> getContactFromID(item -> text(1));
+        QTreeWidgetItem * info_item = new QTreeWidgetItem(this -> infoWidget);
+        info_item -> setText(0, QString::number(this -> tmp -> peopleID));
+        info_item -> setText(1, this -> castSize(this -> tmp -> picture.toImage().byteCount()));
+        info_item -> setText(2, QString::number(this -> tmp -> picture.width()));
+        info_item -> setText(3, QString::number(this -> tmp -> picture.height()));
+        this -> infoWidget -> addTopLevelItem(info_item);
+        this -> download -> setEnabled(true);
+
+        int w(320), h(480);
+        if(this -> tmp -> picture.width() > this -> tmp -> picture.height()) {
+            w = 480;
+            h = 320;
+        }
+        this -> viewContact -> setEnabled(true);
+        this -> bigPic -> setEnabled(true);
+        this -> bigPic -> setIconSize(QSize(w, h));
+        this -> tmpPic = this -> tmp -> picture.scaled(w, h, Qt::KeepAspectRatio, Qt::SmoothTransformation);
+        this -> maximizeView();
+    }
+
+    /** --------------------------------------------------------------------------------------------------------------- **/
+
+    void change() {
+        this -> bigPic -> setIcon(QIcon(this -> tmpPic));
+        this -> maximizeView();
+    }
+
+    /** --------------------------------------------------------------------------------------------------------------- **/
+
+    void fullSize() {
+        QDialog * that = new QDialog(this, Qt::Popup);
+        QHBoxLayout * zoom = new QHBoxLayout;
+        QPushButton * big = new QPushButton(that);
+
+        QCursor cursor(QPixmap(this -> appPath + "/utils/icons/zoom_out.png").scaled(24, 24, Qt::KeepAspectRatio, Qt::SmoothTransformation));
+
+        big -> setIconSize(this -> tmp -> picture.size());
+        big -> setIcon(QIcon(this -> tmp -> picture));
+        big -> setStyleSheet("QPushButton {border: none;}");
+        big -> setCursor(cursor);
+        big -> setToolTip(tr("Click on the picture to close it"));
+        this -> connect(big, SIGNAL(clicked()), that, SLOT(close()));
+
+        zoom -> addWidget(big);
+
+        that -> setLayout(zoom);
+        that -> show();
+    }
+
+    /** --------------------------------------------------------------------------------------------------------------- **/
+
+    void savePic() {
+        this -> tmp -> picture.save(QFileDialog::getSaveFileName(this, tr("Save current picture"), QDir::homePath() + "/untitled.png", tr("Images (*.png *.xpm *.jpg *.gif *.bmp)")), 0, 100);
+    }
+
+    /** --------------------------------------------------------------------------------------------------------------- **/
+
+    void findPictures(const QString & name) {
+        this -> PicturesTreeList -> clear();
+        int cpt(0);
+
+        for(std::vector<people *>::iterator it(this -> DBManager -> book.begin()); it != this -> DBManager -> book.end(); ++it) {
+            if(((*it) -> first + " " + (*it) -> last).contains(name, Qt::CaseInsensitive)) {
+                ++cpt;
+                QTreeWidgetItem * item = new QTreeWidgetItem(this -> PicturesTreeList);
+                item -> setText(0, (this -> sortPicture -> currentIndex() == 1 ? ((*it) -> last + " " + (*it) -> first) : ((*it) -> first + " " + (*it) -> last)));
+                item -> setIcon(0, (*it) -> thumbnail);
+                item -> setFont(0, QFont("", 8, QFont::Bold));
+                item -> setText(1, QString::number((*it) -> peopleID));
+            }
+        }
+
+        this -> PicturesTreeList -> setHeaderLabel(QString::number(cpt) + " " + (cpt > 1 ? tr("pictures") : tr("picture")));
+        this -> PicturesTreeList -> sortItems(0, Qt::AscendingOrder);
+        this -> searchPicture -> noResult(cpt == 0);
+    }
+
+    /** --------------------------------------------------------------------------------------------------------------- **/
+
+    void viewContactFnc() {
+        emit this -> contactClicked("contacts/" + QString::number(this -> tmp -> peopleID));
+    }
+
+    /** --------------------------------------------------------------------------------------------------------------- **/
+
+private:
+
+    void initAttributes(database * db, const QString & path) {
+        this -> appPath = path;
+        this -> tmpDirectory = this -> appPath + "/utils/tmp";
+        this -> DBManager = db;
+    }
+
+    /** --------------------------------------------------------------------------------------------------------------- **/
+
+    void maximizeView() {
+        this -> view -> verticalScrollBar() -> setValue(this -> view -> verticalScrollBar() -> maximum());
+        this -> view -> horizontalScrollBar() -> setValue(this -> view -> horizontalScrollBar() -> maximum());
+    }
+
+    /** --------------------------------------------------------------------------------------------------------------- **/
+
+    people * getContactFromID(const QString & ID) {
+        for(std::vector<people *>::iterator it(this -> DBManager -> book.begin()); it != this -> DBManager -> book.end(); ++it)
+            if(QString::number((*it) -> peopleID) == ID) return *it;
+        return 0;
+    }
+
+    /** --------------------------------------------------------------------------------------------------------------- **/
+
+    QString castSize(const int & bytes) {
+        QString suffix("Ko");
+        double size = bytes;
+        size /= 1048576;
+        if(size >= 1) suffix = "Mo";
+        else size *= 1000;
+        return QString::number(size, 'f', 2) + " " + suffix;
+    }
+
+    /** --------------------------------------------------------------------------------------------------------------- **/
+
+    QTreeWidget * PicturesTreeList, * infoWidget;
+    QString appPath, tmpDirectory;
+    QComboBox * sortPicture;
+    QPushButton * bigPic, * download, * viewContact;
+    QPixmap tmpPic;
+    QGraphicsView * view;
+    QSequentialAnimationGroup  * group;
+
+    database * DBManager;
+    SearchBar * searchPicture;
+    people * tmp;
+
+Q_SIGNALS:
+
+    void contactClicked(const QString &);
+};
+
+/** --------------------------------------------------------------------------------------------------------------- **/
+
+#endif // PICTURES_HPP

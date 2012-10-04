@@ -1,7 +1,7 @@
 /****************************************************************************
 ** Meta object code from reading C++ file 'manager.hpp'
 **
-** Created: Sat 21. Apr 20:04:04 2012
+** Created: Tue 2. Oct 20:43:14 2012
 **      by: The Qt Meta Object Compiler version 62 (Qt 4.7.4)
 **
 ** WARNING! All changes made in this file will be lost!

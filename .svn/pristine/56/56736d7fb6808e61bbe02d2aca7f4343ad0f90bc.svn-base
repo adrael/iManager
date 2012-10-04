@@ -1,0 +1,405 @@
+/****************************************************************************
+*  Copyright (C) 2011 Raphaël MARQUES <work.rmarques@gmail.com>
+*
+*  This program is free software: you can redistribute it and/or modify
+*  it under the terms of the GNU General Public License as published by
+*  the Free Software Foundation, either version 3 of the License, or
+*  (at your option) any later version.
+*
+*  This program is distributed in the hope that it will be useful,
+*  but WITHOUT ANY WARRANTY; without even the implied warranty of
+*  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+*  GNU General Public License for more details.
+*
+*  You should have received a copy of the GNU General Public License
+*  along with this program.  If not, see <http://www.gnu.org/licenses/>.
+****************************************************************************/
+
+/** --------------------------------------------------------------------------------------------------------------- **/
+
+#ifndef DB_HPP
+#define DB_HPP
+
+/** --------------------------------------------------------------------------------------------------------------- **/
+
+#include <qtsql>
+#include <qmessagebox.h>
+
+/** --------------------------------------------------------------------------------------------------------------- **/
+
+#include <map>
+
+/** --------------------------------------------------------------------------------------------------------------- **/
+
+#include "people.hpp"
+
+/** --------------------------------------------------------------------------------------------------------------- **/
+
+class database : public QWidget {
+
+    Q_OBJECT
+
+public:
+
+    std::vector<people *> book;
+
+    database(QWidget * parent = 0, const QString & path = "") : QWidget(parent) {
+        this -> establishNames(path);
+        this -> dbPath = this -> fillPath();
+        this -> phones = this -> fillPhone();
+        this -> names  = this -> fillName();
+    }
+
+    ~database() {
+        this -> removeDatabases();
+    }
+
+    /** --------------------------------------------------------------------------------------------------------------- **/
+
+    void openDatabases() {
+        QString errors("");
+        for(std::map<QString, QString>::iterator it(this -> names.begin()); it != this -> names.end(); ++it) {
+            QSqlDatabase tmp = QSqlDatabase::addDatabase("QSQLITE", this -> tmpDirectory + "/" + it -> second);
+            tmp.setDatabaseName(this -> tmpDirectory + "/" + it -> second);
+            if(!tmp.open())
+                errors += "  - " + it -> second + "\n";
+        }
+
+        if(!(errors == ""))
+            QMessageBox::critical(this, tr("Cannot open database"),
+                                  tr("Error") +":\n" + tr("Cannot open following database(s)") + ":\n" + errors, QMessageBox::Ok);
+    }
+
+    /** --------------------------------------------------------------------------------------------------------------- **/
+
+    void removeDatabases() {
+        std::vector<QString> dbs;
+        for(std::map<QString, QString>::iterator it(this -> names.begin()); it != this -> names.end(); ++it) {
+            qDebug() << it -> second;
+            QSqlDatabase tmp = QSqlDatabase::database(this -> tmpDirectory + "/" + it -> second);
+            if(tmp.isOpen())
+                tmp.close();
+            dbs.push_back(this -> tmpDirectory + "/" + it -> second);
+        }
+
+        for(std::vector<QString>::iterator it(dbs.begin()); it != dbs.end(); ++it)
+            QSqlDatabase::removeDatabase(*it);
+    }
+
+    /** --------------------------------------------------------------------------------------------------------------- **/
+
+    void dbError(const QSqlError & dbe) {
+        QMessageBox::critical(this, tr("Cannot open database"),
+                              tr("Error") + ":\n" + castError(dbe.type()) + "\n\n" + dbe.text(), QMessageBox::Ok);
+    }
+
+    /** --------------------------------------------------------------------------------------------------------------- **/
+
+    QString castError(const QSqlError::ErrorType & et) {
+        switch(et) {
+        case QSqlError::NoError:
+            return tr("No error occurred.");
+            break;
+
+        case QSqlError::ConnectionError:
+            return tr("Connection error.");
+            break;
+
+        case QSqlError::StatementError:
+            return tr("SQL statement syntax error.");
+            break;
+
+        case QSqlError::TransactionError:
+            return tr("Transaction failed error.");
+            break;
+
+        case QSqlError::UnknownError:
+            return tr("Unknown error.");
+            break;
+
+        default:
+            return tr("!! Error type cannot be determined !!");
+        }
+    }
+
+    /** --------------------------------------------------------------------------------------------------------------- **/
+
+    void importDatabases(const QString & iPhone) {
+        if(iPhone != "3G" && iPhone != "3GS" && iPhone != "4" && iPhone != "4S")
+            QMessageBox::critical(this, tr("Cannot recognize the selected iPhone"),
+                                  tr("Error") + ":\n" + tr("It seems that the iPhone version selected") + " (\"" + iPhone +
+                                  "\")\n" + tr("is not yet supported by the software.") + "\n", QMessageBox::Ok);
+        else {
+            QString folder(this -> dbPath["path"] + this -> phones[iPhone]), fileName("");
+            std::vector<QString> errors, copies;
+            for(std::map<QString, QString>::iterator it(this -> dbPath.begin()); it != this -> dbPath.end(); ++it) {
+                if(it -> first != "path") {
+                    fileName = folder + "/" + it -> second;
+                    if(QFile::exists(fileName)) {
+                        this -> checkCopy(this -> names[it -> second]);
+                        if(!QFile::copy(fileName, this -> appPath + "/utils/tmp/" + this -> names[it -> second]))
+                            copies.push_back(this -> names[it -> second]);
+                    } else errors.push_back(this -> names[it -> second]);
+                }
+            }
+
+            if(!errors.empty()) {
+                QString missing("");
+                for(std::vector<QString>::iterator it(errors.begin()); it != errors.end(); ++it)
+                    missing += "\n   - " + *it;
+                QMessageBox::warning(this, (errors.size() > 1 ? tr("Some databases are missing") : tr("A database is missing")),
+                                     tr("Warning") + ":\n" + tr("Cannot found") + " >>\n" + missing, QMessageBox::Ok);
+            }
+
+            if(!copies.empty()) {
+                QString missing(""), title(copies.size() > 1 ? tr("some databases") : tr("a database"));
+                for(std::vector<QString>::iterator it(copies.begin()); it != copies.end(); ++it)
+                    missing += "\n   - " + *it;
+                QMessageBox::warning(this, tr("Cannot copy") + " " + title,
+                                     tr("Warning") + ":\n" + tr("Cannot copy") + " >>\n" + missing, QMessageBox::Ok);
+            }
+        }
+    }
+
+    /** --------------------------------------------------------------------------------------------------------------- **/
+
+    void checkCopy(const QString & name) {
+        if(QFile::exists(this -> appPath + "/utils/tmp/" + name))
+            if(!QFile::remove(this -> appPath + "/utils/tmp/" + name))
+                qDebug() << tr("Unable to remove file") + " : " << this -> appPath + "/utils/tmp/" + name;
+    }
+
+    /** --------------------------------------------------------------------------------------------------------------- **/
+
+    QSqlDatabase getDatabase(const QString & tmp) {
+        return QSqlDatabase::database(this -> tmpDirectory + "/" + this -> names[this -> dbPath[tmp]]);
+    }
+
+    /** --------------------------------------------------------------------------------------------------------------- **/
+
+    int countDatabases() {
+        return this -> names.size();
+    }
+
+    /** --------------------------------------------------------------------------------------------------------------- **/
+
+    void loadBook() {
+        int size(0), cpt(0);
+        QSqlQuery contactsQuery(this -> getDatabase("contacts")), picQuery(this -> getDatabase("pictures"));
+
+        contactsQuery.exec("SELECT * FROM ABMultiValueLabel");
+        while(contactsQuery.next()) {
+            ++cpt;
+            this -> peopleLabels.insert(std::make_pair(cpt, this -> castLabel(contactsQuery.value(0).toString())));
+        }
+
+        contactsQuery.exec("SELECT * FROM ABPerson");
+        while(contactsQuery.next()) {
+            this -> book.push_back(new people(this));
+            size = this -> book.size() - 1;
+            this -> book.at(size) -> recordID = contactsQuery.value(0).toString();
+            this -> book.at(size) -> first    = contactsQuery.value(1).toString();
+            this -> book.at(size) -> last     = contactsQuery.value(2).toString();
+            this -> book.at(size) -> birth    = contactsQuery.value(11).toDouble();
+            this -> book.at(size) -> nick     = contactsQuery.value(13).toString();
+            this -> book.at(size) -> peopleID = size;
+        }
+
+        for(std::vector<people *>::iterator it(this -> book.begin()); it != this -> book.end(); ++it) {
+            QPixmap tmp, b_tmp;
+
+            picQuery.exec("SELECT data FROM ABThumbnailImage WHERE record_id = " + (*it) -> recordID + " AND format = 0");
+            picQuery.next();
+            (*it) -> correctPicture = (picQuery.value(0).toByteArray() != "");
+            if(!(*it) -> correctPicture) {
+                tmp.load(this -> appPath + "/utils/icons/nobody.png");
+                (*it) -> thumbnail = QIcon(tmp);
+            } else {
+                tmp.loadFromData(picQuery.value(0).toByteArray());
+                (*it) -> thumbnail = QIcon(tmp);
+                picQuery.exec("SELECT * FROM ABFullSizeImage WHERE record_id = " + (*it) -> recordID);
+                picQuery.next();
+                b_tmp.loadFromData(picQuery.value(4).toByteArray());
+                (*it) -> picture = b_tmp;
+            }
+
+            contactsQuery.exec("SELECT * FROM ABMultiValue WHERE record_id = " + (*it) -> recordID);
+            while(contactsQuery.next()) {
+                (*it) -> UID = contactsQuery.value(0).toString();
+
+                switch(contactsQuery.value(4).toInt()) {
+                case 1:
+                    (*it) -> cell.push_back(contactsQuery.value(5).toString());
+                    break;
+                case 2:
+                    if(!contactsQuery.value(5).toString().isEmpty())
+                        (*it) -> home.push_back(contactsQuery.value(5).toString());
+                    else {
+                        contactsQuery.exec("SELECT * FROM ABMultiValueEntry WHERE parent_id = " + (*it) -> UID + " AND key = 1");
+                        contactsQuery.next();
+                        (*it) -> address = contactsQuery.value(2).toString();
+                        contactsQuery.exec("SELECT * FROM ABMultiValueEntry WHERE parent_id = " + (*it) -> UID + " AND key = 2");
+                        contactsQuery.next();
+                        (*it) -> address += "\n" + contactsQuery.value(2).toString();
+                        contactsQuery.exec("SELECT * FROM ABMultiValueEntry WHERE parent_id = " + (*it) -> UID + " AND key = 3");
+                        contactsQuery.next();
+                        (*it) -> address += " " + contactsQuery.value(2).toString();
+                    }
+                    break;
+                case 5:
+                    (*it) -> anniversary = contactsQuery.value(5).toDouble();
+                    break;
+                case 7:
+                    (*it) -> homePage = contactsQuery.value(5).toString();
+                    break;
+                case 8:
+                    (*it) -> work = contactsQuery.value(5).toString();
+                    break;
+                default:
+                    (*it) -> infos.insert(std::make_pair(this -> peopleLabels[contactsQuery.value(4).toInt()], contactsQuery.value(5).toString()));
+                }
+            }
+        }
+    }
+
+    /** --------------------------------------------------------------------------------------------------------------- **/
+
+    people * getContactFromNum(const QString & num) {
+        for(std::vector<people *>::iterator it(this -> book.begin()); it != this -> book.end(); ++it) {
+            for(std::vector<QString>::iterator vit((*it) -> cell.begin()); vit != (*it) -> cell.end(); ++vit) {
+                if(*vit == num)
+                    return *it;
+            }
+
+            for(std::vector<QString>::iterator vit((*it) -> home.begin()); vit != (*it) -> home.end(); ++vit) {
+                if(*vit == num)
+                    return *it;
+            }
+        }
+
+        return 0;
+    }
+
+    /** --------------------------------------------------------------------------------------------------------------- **/
+
+    QString castLabel(const QString & label) {
+        if(QString::compare("_$!<Mobile>!$_", label, Qt::CaseInsensitive) == 0)
+            return tr("mobile");
+        else if(QString::compare("_$!<Home>!$_", label, Qt::CaseInsensitive) == 0)
+            return tr("home");
+        else if(QString::compare("_$!<Anniversary>!$_", label, Qt::CaseInsensitive) == 0)
+            return tr("birthday");
+        else if(QString::compare("_$!<HomePage>!$_", label, Qt::CaseInsensitive) == 0)
+            return tr("home page");
+        else if(QString::compare("_$!<Work>!$_", label, Qt::CaseInsensitive) == 0)
+            return tr("work");
+        else return label;
+    }
+
+    /** --------------------------------------------------------------------------------------------------------------- **/
+
+public slots:
+
+    void openContactsDatabase() {
+        qDebug() << "db";
+    }
+
+    /** --------------------------------------------------------------------------------------------------------------- **/
+
+    void openCalendarDatabase() {
+        qDebug() << "db";
+    }
+
+    /** --------------------------------------------------------------------------------------------------------------- **/
+
+    void openCallsDatabase() {
+        qDebug() << "db";
+    }
+
+    /** --------------------------------------------------------------------------------------------------------------- **/
+
+    void openNotesDatabase() {
+        qDebug() << "db";
+    }
+
+    /** --------------------------------------------------------------------------------------------------------------- **/
+
+    void openPicturesDatabase() {
+        qDebug() << "db";
+    }
+
+    /** --------------------------------------------------------------------------------------------------------------- **/
+
+    void openSmsDatabase() {
+        qDebug() << "db";
+    }
+
+    /** --------------------------------------------------------------------------------------------------------------- **/
+
+    void openVaultDatabase() {
+        qDebug() << "db";
+    }
+
+    /** --------------------------------------------------------------------------------------------------------------- **/
+
+private:
+
+    void establishNames(const QString & path) {
+        this -> appPath      = path;
+        this -> tmpDirectory = this -> appPath + "/utils/tmp";
+        this -> sms          = "3d0d7e5fb2ce288813306e4d4636395e047a3d28";
+        this -> contacts     = "31bb7ba8914766d4ba40d6dfb6113c8b614be442";
+        this -> pictures     = "cd6702cea29fe89cf280a76794405adb17f9a0ee";
+        this -> notes        = "ca3bc056d4da0bbf88b5fb3be254f3b7147e639c";
+        this -> calls        = "2b2b0084a1bc3a5ac8c27afdf14afb42c61a19ca";
+        this -> calendar     = "2041457d5fe04d39d0ab481178355df6781e6858";
+    }
+
+    /** --------------------------------------------------------------------------------------------------------------- **/
+
+    std::map<QString, QString> fillPath() {
+        std::map<QString, QString> tmp;
+        tmp.insert(std::make_pair("path",     QDir::homePath() + "/AppData/Roaming/Apple Computer/MobileSync/Backup/"));
+        tmp.insert(std::make_pair("sms",      this -> sms));
+        tmp.insert(std::make_pair("contacts", this -> contacts));
+        tmp.insert(std::make_pair("pictures", this -> pictures));
+        tmp.insert(std::make_pair("notes",    this -> notes));
+        tmp.insert(std::make_pair("calls",    this -> calls));
+        tmp.insert(std::make_pair("calendar", this -> calendar));
+        return tmp;
+    }
+
+    /** --------------------------------------------------------------------------------------------------------------- **/
+
+    std::map<QString, QString> fillName() {
+        std::map<QString, QString> tmp;
+        tmp.insert(std::make_pair(this -> sms,      "SMS.db"));
+        tmp.insert(std::make_pair(this -> contacts, "contacts.sqlitedb"));
+        tmp.insert(std::make_pair(this -> pictures, "contactsPictures.sqlitedb"));
+        tmp.insert(std::make_pair(this -> notes,    "notes.db"));
+        tmp.insert(std::make_pair(this -> calls,    "calls.db"));
+        tmp.insert(std::make_pair(this -> calendar, "calendar.sqlitedb"));
+        return tmp;
+    }
+
+    /** --------------------------------------------------------------------------------------------------------------- **/
+
+    std::map<QString, QString> fillPhone () {
+        std::map<QString, QString> tmp;
+        tmp.insert(std::make_pair("3G",  "ac084147c3eedd00535fcb9ac613eaddd005414e"));
+        tmp.insert(std::make_pair("3GS", ""));
+        tmp.insert(std::make_pair("4",   ""));
+        tmp.insert(std::make_pair("4S",  "2ffe2032082428e680788658b352178efd953416"));
+        return tmp;
+    }
+
+    /** --------------------------------------------------------------------------------------------------------------- **/
+
+    QString appPath, tmpDirectory, sms, contacts, pictures, notes, calls, calendar;
+    std::map<QString, QString> dbPath, phones, names;
+    std::map<int, QString> peopleLabels;
+};
+
+/** --------------------------------------------------------------------------------------------------------------- **/
+
+#endif // DB_HPP

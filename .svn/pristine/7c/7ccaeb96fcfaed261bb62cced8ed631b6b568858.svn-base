@@ -1,0 +1,144 @@
+
+/****************************************************************************
+*  Copyright (C) 2011 Raphaël MARQUES <work.rmarques@gmail.com>
+*
+*  This program is free software: you can redistribute it and/or modify
+*  it under the terms of the GNU General Public License as published by
+*  the Free Software Foundation, either version 3 of the License, or
+*  (at your option) any later version.
+*
+*  This program is distributed in the hope that it will be useful,
+*  but WITHOUT ANY WARRANTY; without even the implied warranty of
+*  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+*  GNU General Public License for more details.
+*
+*  You should have received a copy of the GNU General Public License
+*  along with this program.  If not, see <http://www.gnu.org/licenses/>.
+****************************************************************************/
+
+/** --------------------------------------------------------------------------------------------------------------- **/
+
+#ifndef CONFIGDIALOG_HPP
+#define CONFIGDIALOG_HPP
+
+/** --------------------------------------------------------------------------------------------------------------- **/
+
+#include <qlistwidget.h>
+#include <qstackedwidget.h>
+#include <qdialog.h>
+
+/** --------------------------------------------------------------------------------------------------------------- **/
+
+#include "configpages.hpp"
+
+/** --------------------------------------------------------------------------------------------------------------- **/
+
+class ConfigDialog : public QDialog
+{
+    Q_OBJECT
+
+public:
+
+    ConfigDialog(QWidget * parent = 0, const QString & path = "") : QDialog(parent, Qt::Dialog) {
+        this -> appPath = path;
+        this -> contentsWidget = new QListWidget();
+        this -> contentsWidget -> setViewMode(QListView::IconMode);
+        this -> contentsWidget -> setIconSize(QSize(62, 62));
+        this -> contentsWidget -> setMovement(QListView::Static);
+        this -> contentsWidget -> setFixedWidth(113);
+        this -> contentsWidget -> setSpacing(12);
+
+        this -> global = new GlobalPage(this);
+        this -> sms = new SMSPage(this, this -> appPath);
+
+        this -> pagesWidget = new QStackedWidget();
+        this -> pagesWidget -> addWidget(this -> global);
+        this -> pagesWidget -> addWidget(this -> sms);
+
+        QPushButton * closeButton = new QPushButton(QIcon(this -> appPath + "/utils/icons/cancel.png"), tr("Cancel"), this);
+        this -> connect(closeButton, SIGNAL(clicked()), this, SLOT(close()));
+
+        QPushButton * applyButton = new QPushButton(QIcon(this -> appPath + "/utils/icons/apply.png"), tr("Apply"), this);
+        this -> connect(applyButton, SIGNAL(clicked()), this, SLOT(getInfo()));
+        this -> connect(applyButton, SIGNAL(clicked()), this, SLOT(close()));
+
+        QPushButton * restoreButton = new QPushButton(QIcon(this -> appPath + "/utils/icons/restore.png"), tr("Reset"), this);
+        this -> connect(restoreButton, SIGNAL(clicked()), this, SLOT(close()));
+
+        this -> createIcons();
+        this -> contentsWidget -> setCurrentRow(0);
+
+        QHBoxLayout * horizontalLayout = new QHBoxLayout();
+        horizontalLayout -> addWidget(this -> contentsWidget);
+        horizontalLayout -> addWidget(this -> pagesWidget, 1);
+
+        QHBoxLayout * buttonsLayout = new QHBoxLayout();
+        buttonsLayout -> addStretch(1);
+        buttonsLayout -> addWidget(applyButton);
+        buttonsLayout -> addWidget(closeButton);
+        buttonsLayout -> addWidget(restoreButton);
+
+        QVBoxLayout * mainLayout = new QVBoxLayout();
+        mainLayout -> addLayout(horizontalLayout);
+        mainLayout -> addStretch(1);
+        mainLayout -> addSpacing(12);
+        mainLayout -> addLayout(buttonsLayout);
+
+        this -> setLayout(mainLayout);
+        this -> setWindowTitle(tr("Parameters"));
+        this -> setWindowModality(Qt::WindowModal);
+        this -> setWindowIcon(QIcon(this -> appPath + "/utils/icons/tools.png"));
+    }
+
+    /** --------------------------------------------------------------------------------------------------------------- **/
+
+public slots:
+
+    void changePage(QListWidgetItem * current, QListWidgetItem * previous) {
+        if (!current) current = previous;
+        this -> pagesWidget -> setCurrentIndex(this -> contentsWidget -> row(current));
+    }
+
+    /** --------------------------------------------------------------------------------------------------------------- **/
+
+    void getInfo(){
+        if(!this -> sms -> BGWay -> text().isEmpty()); //this -> ancestor = "background-image: url(\"" + this -> sms -> BGWay -> text() + "\");";
+        else if(!this -> sms -> BGC -> text().isEmpty()); //this -> ancestor = "background: " + this -> sms -> BGC -> text() + ";";
+        //else this -> ancestor = "background: #dbe2ed;";
+    }
+
+    /** --------------------------------------------------------------------------------------------------------------- **/
+
+private:
+
+    void createIcons() {
+        QListWidgetItem * globalButton = new QListWidgetItem(this -> contentsWidget);
+        globalButton -> setIcon(QIcon(this -> appPath + "/utils/icons/manage.png"));
+        globalButton -> setText(tr("iManager"));
+        globalButton -> setTextAlignment(Qt::AlignHCenter);
+        globalButton -> setFlags(Qt::ItemIsSelectable | Qt::ItemIsEnabled);
+
+        QListWidgetItem * smsButton = new QListWidgetItem(this -> contentsWidget);
+        smsButton -> setIcon(QIcon(this -> appPath + "/utils/icons/sms_icon.png"));
+        smsButton -> setText(tr("SMS"));
+        smsButton -> setTextAlignment(Qt::AlignHCenter);
+        smsButton -> setFlags(Qt::ItemIsSelectable | Qt::ItemIsEnabled);
+
+        connect(this -> contentsWidget, SIGNAL(currentItemChanged(QListWidgetItem *, QListWidgetItem *)), this, SLOT(changePage(QListWidgetItem *, QListWidgetItem *)));
+    }
+
+    /** --------------------------------------------------------------------------------------------------------------- **/
+
+    QListWidget * contentsWidget;
+    QStackedWidget * pagesWidget;
+    QString appPath;
+
+    GlobalPage * global;
+    SMSPage * sms;
+};
+
+/** --------------------------------------------------------------------------------------------------------------- **/
+
+#endif // CONFIGDIALOG_HPP
+
+/** --------------------------------------------------------------------------------------------------------------- **/

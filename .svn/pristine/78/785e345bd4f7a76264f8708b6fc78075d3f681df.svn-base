@@ -1,0 +1,65 @@
+body{
+	background-image: url('../icons/body.png');
+    font-family: 'Calibri', Arial, sans-serif;
+    font-size: 15px;margin: 0;
+    padding: 0;
+}
+
+#header{
+    position: fixed;
+    background-image: url('../icons/header.png');
+    background-repeat: repeat-x;
+    height: 44px;
+    width: 100%;
+    color: white;
+    text-align: center;
+    text-shadow:0 1px 1px #333;
+    padding-top: 0px;
+}
+
+.pic{
+    position: absolute;
+    border: 1px solid black;
+    -webkit-border-radius:3px;
+    margin-left: 10px;
+}
+
+#name{
+    font-weight: bold;
+    margin-left: 80px;
+    font-size: 18px;
+    padding-top: 12px;
+    text-shadow:0 1px 1px white;
+}
+
+#surname{
+    font-size: 14px;
+}
+
+#row{
+    padding-left: 85px;
+    padding-top: 10px;
+    padding-bottom: 10px;
+    margin-left: 5px;
+    margin-right: 5px;
+    border:1px solid gray;
+    text-shadow:0 1px 1px white;
+    -webkit-border-radius:7px;
+    background: white;
+}
+
+.title{
+    color: #5c6c7c;
+    padding-right: 10px;
+    margin-left: -55px;
+}
+
+#info img{
+    position: absolute;
+    margin-left: 120px;
+    margin-top: 14px;
+}
+
+a {
+	cursor:pointer;
+}
