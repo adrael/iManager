@@ -353,6 +353,7 @@ private:
         this -> notes        = "ca3bc056d4da0bbf88b5fb3be254f3b7147e639c";
         this -> calls        = "2b2b0084a1bc3a5ac8c27afdf14afb42c61a19ca";
         this -> calendar     = "2041457d5fe04d39d0ab481178355df6781e6858";
+        this -> properties   = "Info.plist";
     }
 
     /** --------------------------------------------------------------------------------------------------------------- **/
@@ -360,12 +361,13 @@ private:
     std::map<QString, QString> fillPath() {
         std::map<QString, QString> tmp;
         tmp.insert(std::make_pair("path",     QDir::homePath() + "/AppData/Roaming/Apple Computer/MobileSync/Backup/"));
-        tmp.insert(std::make_pair("sms",      this -> sms));
-        tmp.insert(std::make_pair("contacts", this -> contacts));
-        tmp.insert(std::make_pair("pictures", this -> pictures));
-        tmp.insert(std::make_pair("notes",    this -> notes));
-        tmp.insert(std::make_pair("calls",    this -> calls));
-        tmp.insert(std::make_pair("calendar", this -> calendar));
+        tmp.insert(std::make_pair("sms",        this -> sms));
+        tmp.insert(std::make_pair("contacts",   this -> contacts));
+        tmp.insert(std::make_pair("pictures",   this -> pictures));
+        tmp.insert(std::make_pair("notes",      this -> notes));
+        tmp.insert(std::make_pair("calls",      this -> calls));
+        tmp.insert(std::make_pair("calendar",   this -> calendar));
+        tmp.insert(std::make_pair("properties", this -> properties));
         return tmp;
     }
 
@@ -373,12 +375,13 @@ private:
 
     std::map<QString, QString> fillName() {
         std::map<QString, QString> tmp;
-        tmp.insert(std::make_pair(this -> sms,      "SMS.db"));
-        tmp.insert(std::make_pair(this -> contacts, "contacts.sqlitedb"));
-        tmp.insert(std::make_pair(this -> pictures, "contactsPictures.sqlitedb"));
-        tmp.insert(std::make_pair(this -> notes,    "notes.db"));
-        tmp.insert(std::make_pair(this -> calls,    "calls.db"));
-        tmp.insert(std::make_pair(this -> calendar, "calendar.sqlitedb"));
+        tmp.insert(std::make_pair(this -> sms,        "SMS.db"));
+        tmp.insert(std::make_pair(this -> contacts,   "contacts.sqlitedb"));
+        tmp.insert(std::make_pair(this -> pictures,   "contactsPictures.sqlitedb"));
+        tmp.insert(std::make_pair(this -> notes,      "notes.db"));
+        tmp.insert(std::make_pair(this -> calls,      "calls.db"));
+        tmp.insert(std::make_pair(this -> calendar,   "calendar.sqlitedb"));
+        tmp.insert(std::make_pair(this -> properties, "properties.xml"));
         return tmp;
     }
 
@@ -395,7 +398,7 @@ private:
 
     /** --------------------------------------------------------------------------------------------------------------- **/
 
-    QString appPath, tmpDirectory, sms, contacts, pictures, notes, calls, calendar;
+    QString appPath, tmpDirectory, sms, contacts, pictures, notes, calls, calendar, properties;
     std::map<QString, QString> dbPath, phones, names;
     std::map<int, QString> peopleLabels;
 };
